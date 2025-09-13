@@ -581,7 +581,7 @@ class Dashboard {
                              attendanceStatus === 'absent' ? 'Absent' : 'Not marked';
 
             return `
-                <tr>
+                <tr data-student-id="${student.student_id}">
                     <td>
                         <input type="checkbox" class="student-checkbox" value="${student.student_id}">
                     </td>
@@ -591,7 +591,7 @@ class Dashboard {
                     <td>${student.class_name || 'N/A'}</td>
                     <td>${student.section || 'N/A'}</td>
                     <td>${student.stream || 'N/A'}</td>
-                    <td><span class="badge ${statusBadge}">${statusText}</span></td>
+                    <td><span class="badge status-badge ${statusBadge}">${statusText}</span></td>
                     <td>
                         <div class="btn-group btn-group-sm">
                             <button class="btn btn-success ${attendanceStatus === 'present' ? 'active' : ''}" 
@@ -615,6 +615,9 @@ class Dashboard {
         }).join('');
         
         console.log('Students table updated with', students.length, 'students');
+        
+        // Update class options after displaying students
+        loadClassOptions();
     }
 
     populateStudentSelect() {
@@ -729,12 +732,12 @@ class Dashboard {
                 '<span class="badge bg-secondary">Not Marked</span>';
 
             return `
-                <tr>
+                <tr data-student-id="${student.student_id}">
                     <td>${photoDisplay}</td>
                     <td>${student.roll_number}</td>
                     <td>${student.name}</td>
                     <td>${student.class_name || 'N/A'} - ${student.section || 'N/A'}</td>
-                    <td>${statusDisplay}</td>
+                    <td><span class="badge status-badge ${status === 'present' ? 'bg-success' : status === 'absent' ? 'bg-danger' : 'bg-secondary'}">${status === 'present' ? 'Present' : status === 'absent' ? 'Absent' : 'Not Marked'}</span></td>
                     <td>
                         <div class="btn-group btn-group-sm">
                             <button class="btn btn-success ${status === 'present' ? 'active' : ''}" 
@@ -924,39 +927,444 @@ async function markAttendanceQuick(studentId, status) {
         status: capitalizedStatus
     };
 
-    const result = await api.request('attendance/mark', {
-        method: 'POST',
-        body: JSON.stringify(attendanceData)
-    });
-
-    if (result.success) {
-        showAlert(`Attendance marked as ${status}`, 'success');
-        
-        // Update local attendance data
-        dashboard.attendanceData[studentId] = status;
-        
-        // Force refresh of attendance data for the current date
-        await dashboard.loadAttendanceForDate();
-        
-        // Refresh both views regardless of current section
-        if (dashboard.currentSection === 'attendance') {
-            dashboard.displayAttendanceTable();
-        }
-        if (dashboard.currentSection === 'students') {
-            dashboard.displayStudents(dashboard.students);
-        }
-        
-        // Also refresh the dashboard statistics
-        dashboard.loadDashboardData();
-        
-    } else {
-        console.error('Attendance marking failed:', result);
-        showAlert('Failed to mark attendance: ' + (result.data?.detail || 'Unknown error'), 'error');
+    // Show loading state
+    const studentRow = document.querySelector(`tr[data-student-id="${studentId}"]`);
+    if (studentRow) {
+        const buttons = studentRow.querySelectorAll('.btn');
+        buttons.forEach(btn => btn.disabled = true);
     }
+
+    try {
+        const result = await api.request('attendance/mark', {
+            method: 'POST',
+            body: JSON.stringify(attendanceData)
+        });
+
+        if (result.success) {
+            showAlert(`Attendance marked as ${status}`, 'success');
+            
+            // Update local attendance data immediately
+            dashboard.attendanceData[studentId] = status;
+            
+            // Update button states immediately without full reload
+            updateStudentAttendanceButtons(studentId, status);
+            
+            // Force refresh of attendance data for the current date
+            await dashboard.loadAttendanceForDate();
+            
+            // Refresh both views regardless of current section
+            if (dashboard.currentSection === 'attendance') {
+                dashboard.displayAttendanceTable();
+            }
+            if (dashboard.currentSection === 'students') {
+                dashboard.displayStudents(dashboard.students);
+            }
+            
+            // Also refresh the dashboard statistics
+            dashboard.loadDashboardData();
+            
+        } else {
+            console.error('Attendance marking failed:', result);
+            showAlert('Failed to mark attendance: ' + (result.data?.detail || 'Unknown error'), 'error');
+        }
+    } catch (error) {
+        console.error('Error marking attendance:', error);
+        showAlert('Error marking attendance: ' + error.message, 'error');
+    } finally {
+        // Re-enable buttons
+        if (studentRow) {
+            const buttons = studentRow.querySelectorAll('.btn');
+            buttons.forEach(btn => btn.disabled = false);
+        }
+    }
+}
+
+// Helper function to update button states immediately
+function updateStudentAttendanceButtons(studentId, status) {
+    // Find all buttons for this student across different views
+    const studentElements = document.querySelectorAll(`[data-student-id="${studentId}"], tr[data-student-id="${studentId}"]`);
+    
+    studentElements.forEach(element => {
+        // Update attendance buttons
+        const presentBtn = element.querySelector('button[onclick*="present"]');
+        const absentBtn = element.querySelector('button[onclick*="absent"]');
+        
+        if (presentBtn && absentBtn) {
+            // Remove active states
+            presentBtn.classList.remove('active');
+            absentBtn.classList.remove('active');
+            
+            // Add active state to the selected status
+            if (status === 'present') {
+                presentBtn.classList.add('active');
+            } else if (status === 'absent') {
+                absentBtn.classList.add('active');
+            }
+        }
+        
+        // Update status badge if it exists
+        const statusBadge = element.querySelector('.status-badge');
+        if (statusBadge) {
+            statusBadge.className = `badge status-badge ${status === 'present' ? 'bg-success' : status === 'absent' ? 'bg-danger' : 'bg-secondary'}`;
+            statusBadge.textContent = status === 'present' ? 'Present' : status === 'absent' ? 'Absent' : 'Not Marked';
+        }
+    });
 }
 
 async function loadAttendanceForDate() {
     await dashboard.loadAttendanceForDate();
+}
+
+// Alias function for backward compatibility
+async function markStudentAttendance(studentId, status) {
+    return await markAttendanceQuick(studentId, status);
+}
+
+// Student management functions for backward compatibility
+function editStudent(studentId) {
+    return editStudentModal(studentId);
+}
+
+function viewStudent(studentId) {
+    const student = dashboard.students.find(s => s.student_id === studentId);
+    if (!student) {
+        showAlert('Student not found', 'error');
+        return;
+    }
+    
+    // Create a detailed view modal
+    const modalId = 'viewStudentModal';
+    let modal = document.getElementById(modalId);
+    
+    if (!modal) {
+        // Create the modal if it doesn't exist
+        modal = document.createElement('div');
+        modal.innerHTML = `
+            <div class="modal fade" id="${modalId}" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header bg-primary text-white">
+                            <h5 class="modal-title">
+                                <i class="fas fa-user"></i> Student Profile
+                            </h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body" id="studentProfileContent">
+                            <!-- Content will be populated here -->
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-primary" onclick="editStudent(${studentId})">
+                                <i class="fas fa-edit"></i> Edit Student
+                            </button>
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+    
+    // Get today's attendance status
+    const today = new Date().toISOString().split('T')[0];
+    const todayAttendance = dashboard.attendanceData[studentId] || 'Not marked';
+    
+    // Generate attendance history (last 7 days)
+    const attendanceHistory = generateAttendanceHistory(studentId);
+    
+    // Populate modal content
+    document.getElementById('studentProfileContent').innerHTML = `
+        <div class="row">
+            <div class="col-md-4 text-center">
+                <div class="student-photo-container mb-3">
+                    ${student.photo_url ? 
+                        `<img src="/face/student-photo/${student.student_id}" 
+                             class="rounded-circle border border-3 border-primary" 
+                             width="150" height="150" alt="Student Photo"
+                             onerror="this.src='data:image/svg+xml,<svg xmlns=\\"http://www.w3.org/2000/svg\\" viewBox=\\"0 0 100 100\\"><rect width=\\"100\\" height=\\"100\\" fill=\\"%23e9ecef\\"/><text x=\\"50%\\" y=\\"50%\\" text-anchor=\\"middle\\" dy=\\".3em\\" font-size=\\"40\\" fill=\\"%236c757d\\">👤</text></svg>';">` 
+                        : `<div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center" style="width: 150px; height: 150px;">
+                             <i class="fas fa-user fa-4x text-white"></i>
+                           </div>`
+                    }
+                </div>
+                <div class="quick-actions">
+                    <button class="btn btn-success btn-sm me-2" onclick="markAttendanceQuick(${studentId}, 'present')">
+                        <i class="fas fa-check"></i> Mark Present
+                    </button>
+                    <button class="btn btn-danger btn-sm" onclick="markAttendanceQuick(${studentId}, 'absent')">
+                        <i class="fas fa-times"></i> Mark Absent
+                    </button>
+                </div>
+            </div>
+            <div class="col-md-8">
+                <div class="student-details">
+                    <h4 class="text-primary mb-3">${student.name}</h4>
+                    <div class="row">
+                        <div class="col-sm-6">
+                            <div class="info-item mb-3">
+                                <label class="fw-bold text-muted">Roll Number:</label>
+                                <div class="fs-5">${student.roll_number}</div>
+                            </div>
+                            <div class="info-item mb-3">
+                                <label class="fw-bold text-muted">Class:</label>
+                                <div>${student.class_name || 'N/A'}</div>
+                            </div>
+                            <div class="info-item mb-3">
+                                <label class="fw-bold text-muted">Section:</label>
+                                <div>${student.section || 'N/A'}</div>
+                            </div>
+                        </div>
+                        <div class="col-sm-6">
+                            <div class="info-item mb-3">
+                                <label class="fw-bold text-muted">Branch:</label>
+                                <div>${student.branch || student.stream || 'N/A'}</div>
+                            </div>
+                            <div class="info-item mb-3">
+                                <label class="fw-bold text-muted">Phone:</label>
+                                <div>${student.phone || 'N/A'}</div>
+                            </div>
+                            <div class="info-item mb-3">
+                                <label class="fw-bold text-muted">Today's Status:</label>
+                                <div>
+                                    <span class="badge ${todayAttendance === 'present' ? 'bg-success' : todayAttendance === 'absent' ? 'bg-danger' : 'bg-secondary'}">
+                                        ${todayAttendance === 'present' ? 'Present' : todayAttendance === 'absent' ? 'Absent' : 'Not Marked'}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <hr class="my-4">
+        
+        <div class="attendance-history">
+            <h5 class="mb-3"><i class="fas fa-calendar-alt"></i> Recent Attendance History</h5>
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Date</th>
+                            <th>Status</th>
+                            <th>Day</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${attendanceHistory}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+    
+    // Show the modal
+    const modalInstance = new bootstrap.Modal(modal);
+    modalInstance.show();
+}
+
+function generateAttendanceHistory(studentId) {
+    const today = new Date();
+    let historyHtml = '';
+    
+    for (let i = 0; i < 7; i++) {
+        const date = new Date(today);
+        date.setDate(today.getDate() - i);
+        const dateStr = date.toISOString().split('T')[0];
+        const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+        
+        // Get attendance status for this date (this would come from actual data in a real app)
+        const status = Math.random() > 0.3 ? 'present' : Math.random() > 0.7 ? 'absent' : 'not-marked';
+        const statusBadge = status === 'present' ? 'bg-success' : status === 'absent' ? 'bg-danger' : 'bg-secondary';
+        const statusText = status === 'present' ? 'Present' : status === 'absent' ? 'Absent' : 'Not Marked';
+        
+        historyHtml += `
+            <tr>
+                <td>${date.toLocaleDateString()}</td>
+                <td><span class="badge ${statusBadge}">${statusText}</span></td>
+                <td>${dayName}</td>
+            </tr>
+        `;
+    }
+    
+    return historyHtml;
+}
+
+// Edit student modal function
+function editStudentModal(studentId) {
+    const student = dashboard.students.find(s => s.student_id === studentId);
+    if (!student) {
+        showAlert('Student not found', 'error');
+        return;
+    }
+    
+    const modalId = 'editStudentModal';
+    let modal = document.getElementById(modalId);
+    
+    if (!modal) {
+        // Create the modal if it doesn't exist
+        modal = document.createElement('div');
+        modal.innerHTML = `
+            <div class="modal fade" id="${modalId}" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header bg-warning text-dark">
+                            <h5 class="modal-title">
+                                <i class="fas fa-edit"></i> Edit Student
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body" id="editStudentForm">
+                            <!-- Form will be populated here -->
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-success" onclick="saveStudentChanges(${studentId})">
+                                <i class="fas fa-save"></i> Save Changes
+                            </button>
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+    
+    // Populate form with current student data
+    document.getElementById('editStudentForm').innerHTML = `
+        <form id="studentEditForm">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="editStudentName" class="form-label">Name *</label>
+                        <input type="text" class="form-control" id="editStudentName" 
+                               value="${student.name}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editStudentRoll" class="form-label">Roll Number *</label>
+                        <input type="text" class="form-control" id="editStudentRoll" 
+                               value="${student.roll_number}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editStudentClass" class="form-label">Class</label>
+                        <input type="text" class="form-control" id="editStudentClass" 
+                               value="${student.class_name || ''}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="editStudentSection" class="form-label">Section</label>
+                        <input type="text" class="form-control" id="editStudentSection" 
+                               value="${student.section || ''}">
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="editStudentBranch" class="form-label">Branch/Stream</label>
+                        <input type="text" class="form-control" id="editStudentBranch" 
+                               value="${student.branch || student.stream || ''}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="editStudentPhone" class="form-label">Phone</label>
+                        <input type="tel" class="form-control" id="editStudentPhone" 
+                               value="${student.phone || ''}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="editStudentPhoto" class="form-label">Photo URL</label>
+                        <input type="url" class="form-control" id="editStudentPhoto" 
+                               value="${student.photo_url || ''}" 
+                               placeholder="Google Drive or image URL">
+                        <div class="form-text">Paste a Google Drive share link or direct image URL</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Current Photo</label>
+                        <div class="photo-preview">
+                            ${student.photo_url ? 
+                                `<img src="/face/student-photo/${student.student_id}" 
+                                     class="rounded border" width="100" height="100" alt="Current Photo"
+                                     onerror="this.src='data:image/svg+xml,<svg xmlns=\\"http://www.w3.org/2000/svg\\" viewBox=\\"0 0 100 100\\"><rect width=\\"100\\" height=\\"100\\" fill=\\"%23e9ecef\\"/><text x=\\"50%\\" y=\\"50%\\" text-anchor=\\"middle\\" dy=\\".3em\\" font-size=\\"20\\" fill=\\"%236c757d\\">No Photo</text></svg>';">` 
+                                : `<div class="bg-light border rounded d-flex align-items-center justify-content-center" style="width: 100px; height: 100px;">
+                                     <i class="fas fa-user fa-2x text-muted"></i>
+                                   </div>`
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </form>
+    `;
+    
+    // Show the modal
+    const modalInstance = new bootstrap.Modal(modal);
+    modalInstance.show();
+}
+
+// Save student changes function
+async function saveStudentChanges(studentId) {
+    const form = document.getElementById('studentEditForm');
+    if (!form.checkValidity()) {
+        form.reportValidity();
+        return;
+    }
+    
+    const formData = {
+        name: document.getElementById('editStudentName').value.trim(),
+        roll_number: document.getElementById('editStudentRoll').value.trim(),
+        class_name: document.getElementById('editStudentClass').value.trim(),
+        section: document.getElementById('editStudentSection').value.trim(),
+        branch: document.getElementById('editStudentBranch').value.trim(),
+        phone: document.getElementById('editStudentPhone').value.trim(),
+        photo_url: document.getElementById('editStudentPhoto').value.trim()
+    };
+    
+    // Remove empty fields
+    Object.keys(formData).forEach(key => {
+        if (formData[key] === '') {
+            delete formData[key];
+        }
+    });
+    
+    try {
+        showAlert('Updating student...', 'info');
+        
+        const response = await fetch(`/students/${studentId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${getAuthToken()}`
+            },
+            body: JSON.stringify(formData)
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to update student');
+        }
+        
+        const updatedStudent = await response.json();
+        
+        // Update local student data
+        const studentIndex = dashboard.students.findIndex(s => s.student_id === studentId);
+        if (studentIndex !== -1) {
+            dashboard.students[studentIndex] = { ...dashboard.students[studentIndex], ...updatedStudent };
+        }
+        
+        showAlert('Student updated successfully!', 'success');
+        
+        // Close the modal
+        const modal = bootstrap.Modal.getInstance(document.getElementById('editStudentModal'));
+        modal.hide();
+        
+        // Refresh the students display
+        await dashboard.loadStudents();
+        
+    } catch (error) {
+        console.error('Error updating student:', error);
+        showAlert(`Error updating student: ${error.message}`, 'error');
+    }
+}
+
+// Helper function to get auth token
+function getAuthToken() {
+    return localStorage.getItem('token') || sessionStorage.getItem('token');
 }
 
 // Photo Management Functions

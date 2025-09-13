@@ -7,12 +7,38 @@ from typing import List, Optional
 from datetime import date, datetime
 import pandas as pd
 import json
+import os
+import requests
+from PIL import Image
+from io import BytesIO
 from backend.models import Teacher, Student, Class, StudentClass, Attendance
 from backend.schemas import (
     TeacherCreate, TeacherUpdate, StudentCreate, StudentUpdate,
     ClassCreate, ClassUpdate, AttendanceCreate, AttendanceBulkCreate
 )
 from backend.auth import get_password_hash
+
+
+def convert_google_drive_url(url: str) -> str:
+    """Convert Google Drive sharing URL to direct download URL"""
+    if not url or 'drive.google.com' not in url:
+        return url
+    
+    # Extract file ID from sharing URL like: https://drive.google.com/file/d/FILE_ID/view?usp=sharing
+    if '/file/d/' in url and '/view' in url:
+        try:
+            file_id = url.split('/file/d/')[1].split('/')[0]
+            # Convert to direct download URL
+            return f'https://drive.google.com/uc?export=view&id={file_id}'
+        except IndexError:
+            print(f"Failed to extract file ID from URL: {url}")
+            return url
+    
+    # If already in direct format, return as is
+    if 'uc?export=view&id=' in url:
+        return url
+    
+    return url
 
 
 # Teacher CRUD operations
@@ -58,6 +84,11 @@ def update_teacher(db: Session, teacher_id: int, teacher_update: TeacherUpdate):
 # Student CRUD operations
 def create_student(db: Session, student: StudentCreate, teacher_id: int):
     """Create a new student and assign to teacher"""
+    # Check for existing student per teacher (roll numbers are unique per teacher)
+    existing = get_student_by_roll_number(db, student.roll_number, teacher_id)
+    if existing:
+        raise ValueError(f"Student with roll number {student.roll_number} already exists for this teacher")
+    
     db_student = Student(
         roll_number=student.roll_number,
         name=student.name,
@@ -67,10 +98,15 @@ def create_student(db: Session, student: StudentCreate, teacher_id: int):
         photo_url=student.photo_url,
         teacher_id=teacher_id
     )
-    db.add(db_student)
-    db.commit()
-    db.refresh(db_student)
-    return db_student
+    
+    try:
+        db.add(db_student)
+        db.commit()
+        db.refresh(db_student)
+        return db_student
+    except Exception as e:
+        db.rollback()
+        raise e
 
 
 def get_students(db: Session, skip: int = 0, limit: int = 100, teacher_id: Optional[int] = None):
@@ -88,9 +124,15 @@ def get_student_by_id(db: Session, student_id: int):
     return db.query(Student).filter(Student.student_id == student_id).first()
 
 
-def get_student_by_roll_number(db: Session, roll_number: str):
-    """Get student by roll number"""
-    return db.query(Student).filter(Student.roll_number == roll_number).first()
+def get_student_by_roll_number(db: Session, roll_number: str, teacher_id: Optional[int] = None):
+    """Get student by roll number, optionally filtered by teacher"""
+    query = db.query(Student).filter(Student.roll_number == roll_number)
+    
+    # If teacher_id is provided, filter by teacher to allow same roll numbers across different teachers
+    if teacher_id:
+        query = query.filter(Student.teacher_id == teacher_id)
+    
+    return query.first()
 
 
 def update_student(db: Session, student_id: int, student_update: StudentUpdate):
@@ -230,10 +272,10 @@ def bulk_import_students(db: Session, file_path: str, teacher_id: Optional[int] 
                     errors.append(f"Row {index + 1}: Missing required fields (Roll Number or Name)")
                     continue
                 
-                # Check if student already exists
-                existing_student = get_student_by_roll_number(db, roll_number)
+                # Check if student already exists for this teacher (roll numbers are unique per teacher)
+                existing_student = get_student_by_roll_number(db, roll_number, teacher_id)
                 if existing_student:
-                    print(f"Student already exists: {name} (Roll: {roll_number})")
+                    print(f"Student with roll number {roll_number} already exists for teacher {teacher_id}: {name}")
                     duplicate_count += 1
                     continue
                 
@@ -242,6 +284,9 @@ def bulk_import_students(db: Session, file_path: str, teacher_id: Optional[int] 
                 # Handle photo URL if provided
                 if photo_url and photo_url.startswith('http'):
                     try:
+                        # Convert Google Drive URL to direct download format
+                        photo_url = convert_google_drive_url(photo_url)
+                        
                         # Create photos directory if it doesn't exist
                         photos_dir = "static/photos"
                         os.makedirs(photos_dir, exist_ok=True)
@@ -285,9 +330,24 @@ def bulk_import_students(db: Session, file_path: str, teacher_id: Optional[int] 
                 
                 # Only create student if teacher_id is provided (for teacher isolation)
                 if teacher_id:
-                    new_student = create_student(db, student_data, teacher_id)
-                    imported_count += 1
-                    print(f"Imported student: {name} (Roll: {roll_number}) for teacher {teacher_id}")
+                    try:
+                        new_student = create_student(db, student_data, teacher_id)
+                        imported_count += 1
+                        print(f"Imported student: {name} (Roll: {roll_number}) for teacher {teacher_id}")
+                    except Exception as create_error:
+                        # Handle specific database integrity errors
+                        if "UNIQUE constraint failed" in str(create_error) and "uq_student_roll_teacher" in str(create_error):
+                            error_msg = f"Row {index + 1} ({name}): Roll number {roll_number} already exists for this teacher"
+                            duplicate_count += 1
+                        else:
+                            error_msg = f"Row {index + 1} ({name}): Database error - {str(create_error)}"
+                        
+                        errors.append(error_msg)
+                        print(f"Error creating student: {error_msg}")
+                        
+                        # Rollback the current transaction to continue with next student
+                        db.rollback()
+                        continue
                 else:
                     # Legacy support - create without teacher assignment (not recommended)
                     print(f"Warning: No teacher_id provided for student: {name} (Roll: {roll_number})")

@@ -23,7 +23,7 @@ class TeacherUpdate(BaseModel):
     phone: Optional[str] = None
 
 class TeacherResponse(TeacherBase):
-    teacher_id: str  # Changed to string
+    teacher_id: int  # Changed back to int to match database
     created_at: datetime
     
     class Config:
@@ -37,11 +37,11 @@ class ClassBase(BaseModel):
     branch: Optional[str] = None
 
 class ClassCreate(ClassBase):
-    teacher_id: Optional[str] = None  # Optional for internal use
+    teacher_id: Optional[int] = None  # Optional for internal use
 
 class ClassResponse(ClassBase):
-    class_id: str
-    teacher_id: str
+    class_id: int
+    teacher_id: int
     created_at: datetime
     
     class Config:

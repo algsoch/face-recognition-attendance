@@ -364,6 +364,54 @@ async def dashboard_page():
         return f.read()
 
 
+@app.get("/dashboard/students")
+async def get_dashboard_students(
+    current_teacher: Teacher = Depends(get_current_teacher),
+    db: Session = Depends(get_db)
+):
+    """Get all students for the current teacher's dashboard"""
+    teacher_id = getattr(current_teacher, 'teacher_id')
+    
+    students = db.query(Student).filter(
+        Student.teacher_id == teacher_id,
+        Student.is_active == True
+    ).all()
+    
+    # Get recent attendance for each student
+    student_data = []
+    for student in students:
+        recent_attendance = db.query(Attendance).filter(
+            Attendance.student_id == student.student_id
+        ).order_by(Attendance.date.desc()).limit(5).all()
+        
+        attendance_summary = {
+            "present_days": len([a for a in recent_attendance if a.status == "Present"]),
+            "total_days": len(recent_attendance),
+            "attendance_percentage": round(
+                (len([a for a in recent_attendance if a.status == "Present"]) / len(recent_attendance) * 100) 
+                if recent_attendance else 0, 1
+            )
+        }
+        
+        student_data.append({
+            "student_id": student.student_id,
+            "name": student.name,
+            "roll_number": student.roll_number,
+            "class_name": student.class_name,
+            "section": student.section,
+            "photo_url": student.photo_url,
+            "phone": student.phone,
+            "is_active": student.is_active,
+            "attendance_summary": attendance_summary
+        })
+    
+    return {
+        "students": student_data,
+        "total_count": len(student_data),
+        "teacher_id": teacher_id
+    }
+
+
 @app.get("/student-portal", response_class=HTMLResponse)
 async def student_portal_page():
     """Serve the student portal"""
@@ -435,15 +483,16 @@ async def create_new_student(
     db: Session = Depends(get_db)
 ):
     """Create a new student"""
-    # Check if student with roll number already exists
-    existing_student = get_student_by_roll_number(db, student.roll_number)
+    teacher_id = getattr(current_teacher, 'teacher_id')
+    
+    # Check if student with roll number already exists for this teacher
+    existing_student = get_student_by_roll_number(db, student.roll_number, teacher_id)
     if existing_student:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Student with this roll number already exists"
+            detail="Student with this roll number already exists for your class"
         )
     
-    teacher_id = getattr(current_teacher, 'teacher_id')
     db_student = create_student(db, student, teacher_id)
     return db_student
 
@@ -525,7 +574,7 @@ async def upload_students_file(
         shutil.copyfileobj(file.file, buffer)
     
     # Process file with teacher isolation
-    teacher_id = int(current_teacher.teacher_id)
+    teacher_id = getattr(current_teacher, 'teacher_id')
     result = bulk_import_students(db, str(file_path), teacher_id=teacher_id)
     
     # Clean up uploaded file

@@ -28,9 +28,12 @@ class Teacher(Base):
 
 class Student(Base):
     __tablename__ = "students"
+    __table_args__ = (
+        UniqueConstraint('roll_number', 'teacher_id', name='uq_student_roll_teacher'),
+    )
     
     student_id = Column(Integer, primary_key=True, index=True)
-    roll_number = Column(String(50), unique=True, nullable=False, index=True)
+    roll_number = Column(String(50), nullable=False, index=True)  # Removed unique=True
     name = Column(String(100), nullable=False)
     class_name = Column(String(100), nullable=False)  # Direct class name from CSV
     section = Column(String(10), nullable=False)      # Direct section from CSV

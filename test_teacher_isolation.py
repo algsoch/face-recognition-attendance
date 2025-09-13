@@ -12,14 +12,14 @@ login_data1 = {
 }
 
 try:
-    response = requests.post('http://localhost:8003/auth/login', json=login_data1)
+    response = requests.post('http://localhost:8000/auth/login', json=login_data1)
     if response.status_code == 200:
         token1 = response.json()['access_token']
         print('✅ Teacher 1 login successful')
         
         # Get students for Teacher 1
         headers1 = {'Authorization': f'Bearer {token1}'}
-        students_response1 = requests.get('http://localhost:8003/students', headers=headers1)
+        students_response1 = requests.get('http://localhost:8000/students', headers=headers1)
         if students_response1.status_code == 200:
             students1 = students_response1.json()
             print(f'📚 Teacher 1 sees {len(students1)} students:')
@@ -40,14 +40,14 @@ login_data2 = {
 }
 
 try:
-    response = requests.post('http://localhost:8003/auth/login', json=login_data2)
+    response = requests.post('http://localhost:8000/auth/login', json=login_data2)
     if response.status_code == 200:
         token2 = response.json()['access_token']
         print('✅ Teacher 2 login successful')
         
         # Get students for Teacher 2
         headers2 = {'Authorization': f'Bearer {token2}'}
-        students_response2 = requests.get('http://localhost:8003/students', headers=headers2)
+        students_response2 = requests.get('http://localhost:8000/students', headers=headers2)
         if students_response2.status_code == 200:
             students2 = students_response2.json()
             print(f'📚 Teacher 2 sees {len(students2)} students:')

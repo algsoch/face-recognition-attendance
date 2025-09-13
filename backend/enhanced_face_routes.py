@@ -176,3 +176,163 @@ async def test_student_photo(
         "recognition_result": recognition_result,
         "self_recognition": recognition_result and int(recognition_result['student_id']) == student_id
     }
+
+@face_router.get("/students-with-photos")
+async def get_students_with_photos(
+    current_teacher: Teacher = Depends(get_current_teacher),
+    db: Session = Depends(get_db)
+):
+    """Get all students who have photos for the current teacher"""
+    teacher_id = getattr(current_teacher, 'teacher_id')
+    
+    students = db.query(Student).filter(
+        Student.teacher_id == teacher_id,
+        Student.is_active == True,
+        Student.photo_url.isnot(None),
+        Student.photo_url != ""
+    ).all()
+    
+    return {
+        "students": [
+            {
+                "student_id": student.student_id,
+                "name": student.name,
+                "roll_number": student.roll_number,
+                "class_name": student.class_name,
+                "section": student.section,
+                "photo_url": student.photo_url,
+                "has_encoding": enhanced_face_recognizer.has_encoding(str(student.student_id))
+            }
+            for student in students
+        ],
+        "total_count": len(students)
+    }
+
+@face_router.post("/recognize-from-camera")
+async def recognize_from_camera(
+    file: UploadFile = File(...),
+    current_teacher: Teacher = Depends(get_current_teacher),
+    db: Session = Depends(get_db)
+):
+    """Recognize face from camera/webcam image"""
+    
+    # Validate file type
+    if not file.content_type.startswith('image/'):
+        raise HTTPException(status_code=400, detail="File must be an image")
+    
+    try:
+        # Read uploaded image
+        contents = await file.read()
+        
+        # Convert to OpenCV format
+        image = Image.open(io.BytesIO(contents))
+        if image.mode != 'RGB':
+            image = image.convert('RGB')
+        opencv_image = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+        
+        # Recognize face
+        recognition_result = enhanced_face_recognizer.recognize_face_from_image(opencv_image)
+        
+        if not recognition_result:
+            return {
+                "success": False,
+                "message": "No face recognition result",
+                "confidence": 0.0
+            }
+        
+        # Get student details if recognized
+        student_details = None
+        if recognition_result.get('student_id'):
+            student = db.query(Student).filter(
+                Student.student_id == int(recognition_result['student_id'])
+            ).first()
+            if student:
+                student_details = {
+                    "student_id": student.student_id,
+                    "name": student.name,
+                    "roll_number": student.roll_number,
+                    "class_name": student.class_name,
+                    "section": student.section
+                }
+        
+        return {
+            "success": True,
+            "recognition_result": recognition_result,
+            "student_details": student_details,
+            "timestamp": date.today().isoformat()
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Recognition failed: {str(e)}")
+
+@face_router.get("/test")
+async def test_face_recognition_system(
+    db: Session = Depends(get_db)
+):
+    """Test face recognition system status and basic functionality (no auth required)"""
+    
+    # Get overall system statistics
+    total_students = db.query(Student).filter(Student.is_active == True).count()
+    
+    # Get students with photos count
+    students_with_photos = db.query(Student).filter(
+        Student.is_active == True,
+        Student.photo_url.isnot(None),
+        Student.photo_url != ""
+    ).count()
+    
+    # Get face recognition statistics
+    face_stats = enhanced_face_recognizer.get_statistics()
+    
+    # Test basic face recognition functionality
+    system_status = {
+        "face_recognizer_loaded": enhanced_face_recognizer is not None,
+        "total_students": total_students,
+        "students_with_photos": students_with_photos,
+        "face_encodings_stored": face_stats.get('total_faces', 0),
+        "recognition_ready": students_with_photos > 0,
+        "authentication_required": False  # This endpoint doesn't require auth
+    }
+    
+    return {
+        "status": "ok",
+        "message": "Face recognition system test completed",
+        "system_status": system_status,
+        "face_statistics": face_stats,
+        "timestamp": date.today().isoformat()
+    }
+
+@face_router.get("/student-photo/{student_id}")
+async def get_student_photo(
+    student_id: int,
+    db: Session = Depends(get_db)
+):
+    """Get student photo by student ID"""
+    
+    # Get student
+    student = db.query(Student).filter(Student.student_id == student_id).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+    
+    if not student.photo_url:
+        raise HTTPException(status_code=404, detail="Student has no photo")
+    
+    # If it's a local file path, serve from static directory
+    if not student.photo_url.startswith('http'):
+        from fastapi.responses import FileResponse
+        import os
+        
+        # Construct full path
+        if student.photo_url.startswith('photos/'):
+            file_path = os.path.join("static", student.photo_url)
+        else:
+            file_path = student.photo_url
+            
+        if os.path.exists(file_path):
+            return FileResponse(file_path)
+        else:
+            raise HTTPException(status_code=404, detail="Photo file not found")
+    
+    # If it's a URL, redirect to it
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url=student.photo_url)

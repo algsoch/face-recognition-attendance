@@ -12,54 +12,203 @@
             min-height: 100vh;
             display: flex;
             align-items: center;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
+        
         .login-container {
             background: white;
-            border-radius: 15px;
-            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
             overflow: hidden;
+            backdrop-filter: blur(10px);
+            transition: transform 0.3s ease;
         }
+        
+        .login-container:hover {
+            transform: translateY(-5px);
+        }
+        
         .login-header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            padding: 2rem;
+            padding: 2.5rem 2rem;
             text-align: center;
+            position: relative;
+            overflow: hidden;
         }
+        
+        .login-header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="2" fill="white" opacity="0.1"/><circle cx="20" cy="20" r="1" fill="white" opacity="0.15"/><circle cx="80" cy="30" r="1.5" fill="white" opacity="0.1"/><circle cx="30" cy="80" r="1" fill="white" opacity="0.12"/></svg>');
+            animation: float 6s ease-in-out infinite;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+        
+        .login-header h2 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            position: relative;
+            z-index: 1;
+        }
+        
         .login-form {
-            padding: 2rem;
+            padding: 2.5rem;
         }
+        
         .btn-login {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             border: none;
-            padding: 12px 30px;
-            border-radius: 25px;
+            padding: 15px 30px;
+            border-radius: 30px;
             color: white;
             font-weight: 600;
-            transition: all 0.3s;
+            font-size: 1.1rem;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
         }
+        
+        .btn-login::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            background: rgba(255,255,255,0.2);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+        
+        .btn-login:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+        
         .btn-login:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 15px rgba(0,0,0,0.2);
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
             color: white;
         }
+        
         .form-control {
-            border-radius: 10px;
-            padding: 12px 15px;
+            border-radius: 15px;
+            padding: 15px 20px;
             border: 2px solid #e9ecef;
-            transition: all 0.3s;
+            transition: all 0.3s ease;
+            font-size: 1rem;
         }
+        
         .form-control:focus {
             border-color: #667eea;
-            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+            box-shadow: 0 0 0 0.25rem rgba(102, 126, 234, 0.15);
+            transform: translateY(-2px);
         }
+        
         .input-group-text {
             background: white;
             border: 2px solid #e9ecef;
             border-right: none;
-            border-radius: 10px 0 0 10px;
+            border-radius: 15px 0 0 15px;
+            padding: 15px 15px;
+            transition: all 0.3s ease;
         }
+        
+        .input-group:focus-within .input-group-text {
+            border-color: #667eea;
+            color: #667eea;
+        }
+        
         .alert {
-            border-radius: 10px;
+            border-radius: 15px;
+            border: none;
+            padding: 1rem 1.5rem;
+        }
+        
+        .demo-card {
+            backdrop-filter: blur(10px);
+            background: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 15px;
+            transition: all 0.3s ease;
+        }
+        
+        .demo-card:hover {
+            background: rgba(255,255,255,0.3);
+            transform: translateY(-2px);
+        }
+        
+        .form-check-input:checked {
+            background-color: #667eea;
+            border-color: #667eea;
+        }
+        
+        .text-link {
+            color: #667eea;
+            transition: all 0.3s ease;
+        }
+        
+        .text-link:hover {
+            color: #764ba2;
+            text-decoration: underline !important;
+        }
+        
+        /* Mobile Responsiveness */
+        @media (max-width: 768px) {
+            body {
+                padding: 1rem;
+            }
+            
+            .login-container {
+                margin: 0;
+                border-radius: 15px;
+            }
+            
+            .login-header {
+                padding: 2rem 1.5rem;
+            }
+            
+            .login-header h2 {
+                font-size: 2rem;
+            }
+            
+            .login-form {
+                padding: 2rem 1.5rem;
+            }
+            
+            .form-control {
+                padding: 12px 15px;
+            }
+            
+            .input-group-text {
+                padding: 12px 12px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .login-header h2 {
+                font-size: 1.8rem;
+            }
+            
+            .login-form {
+                padding: 1.5rem 1rem;
+            }
+            
+            .btn-login {
+                padding: 12px 25px;
+                font-size: 1rem;
+            }
         }
     </style>
 </head>
@@ -121,26 +270,26 @@
                         
                         <div class="text-center">
                             <p class="mb-2">Don't have an account?</p>
-                            <a href="#" class="text-decoration-none" onclick="showRegisterForm()">
+                            <a href="#" class="text-decoration-none text-link" onclick="showRegisterForm()">
                                 <i class="fas fa-user-plus"></i> Register as Teacher
                             </a>
                         </div>
                         
                         <div class="text-center mt-3">
-                            <small class="text-muted">
-                                <a href="#" class="text-decoration-none">Forgot Password?</a>
+                            <small>
+                                <a href="#" class="text-decoration-none text-link">Forgot Password?</a>
                             </small>
                         </div>
                     </div>
                 </div>
                 
                 <!-- Demo credentials info -->
-                <div class="card mt-3 bg-info text-white">
+                <div class="card mt-3 demo-card text-white">
                     <div class="card-body text-center">
                         <h6><i class="fas fa-info-circle"></i> Demo Credentials</h6>
                         <small>
-                            Email: john.doe@school.edu<br>
-                            Password: password123
+                            <strong>Email:</strong> john.doe@school.edu<br>
+                            <strong>Password:</strong> password123
                         </small>
                     </div>
                 </div>
