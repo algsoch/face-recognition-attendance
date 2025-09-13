@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teacher Dashboard - Attendance Management</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .sidebar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+        }
+        .nav-link {
+            color: rgba(255,255,255,0.8) !important;
+            transition: all 0.3s;
+        }
+        .nav-link:hover, .nav-link.active {
+            color: white !important;
+            background-color: rgba(255,255,255,0.1);
+            border-radius: 5px;
+        }
+        .card {
+            border: none;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: all 0.3s;
+        }
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 15px rgba(0,0,0,0.2);
+        }
+        .stat-card {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+        .stat-card.present {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+        .stat-card.absent {
+            background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
+        }
+        .stat-card.percentage {
+            background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+        }
+        .table-responsive {
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <nav class="col-md-3 col-lg-2 d-md-block sidebar collapse">
+                <div class="position-sticky pt-3">
+                    <div class="text-center mb-4">
+                        <h4><i class="fas fa-graduation-cap"></i> AMS</h4>
+                        <small>Attendance Management System</small>
+                    </div>
+                    
+                    <ul class="nav flex-column">
+                        <li class="nav-item">
+                            <a class="nav-link active" href="/dashboard" onclick="navigateTo('dashboard'); return false;">
+                                <i class="fas fa-tachometer-alt"></i> Dashboard
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/dashboard/students" onclick="navigateTo('students'); return false;">
+                                <i class="fas fa-users"></i> Students
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/dashboard/classes" onclick="navigateTo('classes'); return false;">
+                                <i class="fas fa-chalkboard"></i> Classes
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/dashboard/attendance" onclick="navigateTo('attendance'); return false;">
+                                <i class="fas fa-clipboard-check"></i> Attendance
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/dashboard/face-recognition" onclick="navigateTo('face-recognition'); return false;">
+                                <i class="fas fa-camera"></i> Face Recognition
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/dashboard/reports" onclick="navigateTo('reports'); return false;">
+                                <i class="fas fa-chart-bar"></i> Reports
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/dashboard/profile" onclick="navigateTo('profile'); return false;">
+                                <i class="fas fa-user"></i> Profile
+                            </a>
+                        </li>
+                    </ul>
+                    
+                    <hr class="my-4">
+                    <div class="text-center">
+                        <button class="btn btn-outline-light btn-sm" onclick="logout()">
+                            <i class="fas fa-sign-out-alt"></i> Logout
+                        </button>
+                    </div>
+                </div>
+            </nav>
+
+            <!-- Main content -->
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                    <h1 class="h2" id="pageTitle">Dashboard</h1>
+                    <div class="btn-toolbar mb-2 mb-md-0">
+                        <div class="btn-group me-2">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="refreshData()">
+                                <i class="fas fa-sync-alt"></i> Refresh
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dashboard Content -->
+                <div id="dashboardContent">
+                    <!-- Stats Cards -->
+                    <div class="row mb-4">
+                        <div class="col-md-3">
+                            <div class="card stat-card">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-users fa-2x mb-2"></i>
+                                    <h3 id="totalStudents">0</h3>
+                                    <p>Total Students</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card stat-card present">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-check-circle fa-2x mb-2"></i>
+                                    <h3 id="presentToday">0</h3>
+                                    <p>Present Today</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card stat-card absent">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-times-circle fa-2x mb-2"></i>
+                                    <h3 id="absentToday">0</h3>
+                                    <p>Absent Today</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card stat-card percentage">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-percentage fa-2x mb-2"></i>
+                                    <h3 id="attendancePercentage">0%</h3>
+                                    <p>Attendance Rate</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Charts Row -->
+                    <div class="row mb-4">
+                        <div class="col-md-8">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-chart-line"></i> Attendance Trends (Last 30 Days)</h5>
+                                </div>
+                                <div class="card-body">
+                                    <canvas id="trendsChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-chart-pie"></i> Today's Attendance</h5>
+                                </div>
+                                <div class="card-body">
+                                    <canvas id="pieChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recent Activity -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-trophy"></i> Top Performers</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div id="topPerformers">
+                                        <div class="loading">
+                                            <i class="fas fa-spinner fa-spin"></i> Loading...
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-exclamation-triangle"></i> Students Needing Attention</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div id="attentionNeeded">
+                                        <div class="loading">
+                                            <i class="fas fa-spinner fa-spin"></i> Loading...
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Students Content (Hidden by default) -->
+                <div id="studentsContent" style="display: none;">
+                    <div class="row mb-3">
+                        <div class="col-md-2">
+                            <button class="btn btn-info w-100" onclick="forceRefreshStudents()" title="Force Refresh Students">
+                                <i class="fas fa-sync-alt"></i> Refresh
+                            </button>
+                        </div>
+                        <div class="col-md-4">
+                            <button class="btn btn-primary" onclick="showAddStudentModal()">
+                                <i class="fas fa-plus"></i> Add Student
+                            </button>
+                            <button class="btn btn-outline-primary" onclick="showUploadModal()">
+                                <i class="fas fa-upload"></i> Upload CSV
+                            </button>
+                        </div>
+                        <div class="col-md-3">
+                            <select class="form-select" id="classFilter" onchange="filterStudentsByClass()">
+                                <option value="">All Classes</option>
+                                <!-- Classes will be loaded here -->
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="btn-group w-100" role="group">
+                                <button class="btn btn-outline-success" onclick="bulkMarkAttendance('present')" title="Mark All Present">
+                                    <i class="fas fa-check"></i> All Present
+                                </button>
+                                <button class="btn btn-outline-danger" onclick="bulkMarkAttendance('absent')" title="Mark All Absent">
+                                    <i class="fas fa-times"></i> All Absent
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <button class="btn btn-primary w-100" onclick="markAttendanceByClass()" title="Class-based Attendance">
+                                <i class="fas fa-clipboard-check"></i> Class Attendance
+                            </button>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="input-group">
+                                <input type="text" class="form-control" placeholder="Search students..." id="studentSearch">
+                                <button class="btn btn-outline-secondary" onclick="searchStudents()">
+                                    <i class="fas fa-search"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0">
+                                <span id="studentCount">Loading...</span> Students
+                                <span id="filteredInfo"></span>
+                            </h6>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="selectAllStudents" onchange="toggleSelectAll()">
+                                <label class="form-check-label" for="selectAllStudents">Select All</label>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th width="5%">
+                                                <input type="checkbox" id="headerCheckbox" onchange="toggleSelectAll()">
+                                            </th>
+                                            <th>Photo</th>
+                                            <th>Roll Number</th>
+                                            <th>Name</th>
+                                            <th>Class</th>
+                                            <th>Section</th>
+                                            <th>Stream</th>
+                                            <th>Attendance Today</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="studentsTable">
+                                        <!-- Students data will be loaded here -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Face Recognition Content -->
+                <div id="faceRecognitionContent" style="display: none;">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-camera"></i> Live Recognition</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="text-center mb-3">
+                                        <video id="video" width="400" height="300" autoplay style="border: 2px solid #ddd; border-radius: 10px; display: none;"></video>
+                                        <canvas id="canvas" width="400" height="300" style="border: 2px solid #ddd; border-radius: 10px; display: none;"></canvas>
+                                        <div id="cameraPlaceholder" style="width: 400px; height: 300px; background: #f8f9fa; border: 2px solid #ddd; border-radius: 10px; display: flex; align-items: center; justify-content: center; margin: 0 auto;">
+                                            <span class="text-muted">Camera preview will appear here</span>
+                                        </div>
+                                    </div>
+                                    <div class="text-center">
+                                        <button class="btn btn-primary me-2" onclick="startCamera()">
+                                            <i class="fas fa-video"></i> Start Camera
+                                        </button>
+                                        <button class="btn btn-success me-2" onclick="captureAndRecognize()" disabled id="captureBtn">
+                                            <i class="fas fa-camera"></i> Capture & Recognize
+                                        </button>
+                                        <button class="btn btn-secondary" onclick="stopCamera()" disabled id="stopBtn">
+                                            <i class="fas fa-stop"></i> Stop Camera
+                                        </button>
+                                    </div>
+                                    <div id="recognitionResult" class="mt-3"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-users"></i> Students with Photos</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div id="studentsWithPhotos">
+                                        <div class="loading">
+                                            <i class="fas fa-spinner fa-spin"></i> Loading...
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-upload"></i> Upload Student Photos</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <label class="form-label">Select Student</label>
+                                            <select class="form-select" id="photoStudentSelect">
+                                                <option value="">Choose a student...</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Student Photo</label>
+                                            <input type="file" class="form-control" id="studentPhotoFile" accept="image/*">
+                                        </div>
+                                    </div>
+                                    <div class="mt-3">
+                                        <button class="btn btn-primary" onclick="uploadStudentPhoto()">
+                                            <i class="fas fa-upload"></i> Upload Photo
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Other content sections will be added here -->
+                <div id="classesContent" style="display: none;">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <button class="btn btn-primary" onclick="showAddClassModal()">
+                                <i class="fas fa-plus"></i> Add Class
+                            </button>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="input-group">
+                                <input type="text" class="form-control" placeholder="Search classes..." id="classSearch">
+                                <button class="btn btn-outline-secondary" onclick="searchClasses()">
+                                    <i class="fas fa-search"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Class Name</th>
+                                            <th>Section</th>
+                                            <th>Stream</th>
+                                            <th>Total Students</th>
+                                            <th>Average Attendance</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="classesTable">
+                                        <!-- Classes data will be loaded here -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="attendanceContent" style="display: none;">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <h4>Quick Attendance</h4>
+                        </div>
+                        <div class="col-md-6 text-end">
+                            <input type="date" class="form-control d-inline-block w-auto" id="attendanceDate" value="" onchange="loadAttendanceForDate()">
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Photo</th>
+                                            <th>Roll Number</th>
+                                            <th>Name</th>
+                                            <th>Class</th>
+                                            <th>Status</th>
+                                            <th>Quick Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="attendanceTable">
+                                        <!-- Attendance data will be loaded here -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="reportsContent" style="display: none;">
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-download"></i> Generate Reports</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label class="form-label">Report Type</label>
+                                        <select class="form-select" id="reportType">
+                                            <option value="attendance">Attendance Report</option>
+                                            <option value="monthly">Monthly Summary</option>
+                                            <option value="student">Individual Student Report</option>
+                                        </select>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <label class="form-label">Start Date</label>
+                                            <input type="date" class="form-control" id="reportStartDate">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">End Date</label>
+                                            <input type="date" class="form-control" id="reportEndDate">
+                                        </div>
+                                    </div>
+                                    <div class="mt-3">
+                                        <button class="btn btn-primary me-2" onclick="generateReport()">
+                                            <i class="fas fa-chart-bar"></i> Generate Report
+                                        </button>
+                                        <button class="btn btn-success" onclick="exportToExcel()">
+                                            <i class="fas fa-file-excel"></i> Export to Excel
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-chart-pie"></i> Quick Stats</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div id="quickStats">
+                                        <div class="d-flex justify-content-between py-2 border-bottom">
+                                            <span>Total Students:</span>
+                                            <strong id="statsTotal">0</strong>
+                                        </div>
+                                        <div class="d-flex justify-content-between py-2 border-bottom">
+                                            <span>Average Attendance:</span>
+                                            <strong id="statsAverage">0%</strong>
+                                        </div>
+                                        <div class="d-flex justify-content-between py-2 border-bottom">
+                                            <span>Classes Conducted:</span>
+                                            <strong id="statsClasses">0</strong>
+                                        </div>
+                                        <div class="d-flex justify-content-between py-2">
+                                            <span>Last Updated:</span>
+                                            <strong id="statsUpdated">-</strong>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-table"></i> Generated Report</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div id="reportOutput">
+                                        <p class="text-muted text-center">Select report type and click "Generate Report" to view data here.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="profileContent" style="display: none;">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-user-circle"></i> Profile Information</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="text-center mb-3">
+                                        <div class="bg-primary rounded-circle d-inline-flex align-items-center justify-content-center" style="width: 80px; height: 80px;">
+                                            <i class="fas fa-user fa-2x text-white"></i>
+                                        </div>
+                                    </div>
+                                    <div id="profileInfo">
+                                        <div class="mb-2">
+                                            <strong>Name:</strong>
+                                            <span id="profileName">Loading...</span>
+                                        </div>
+                                        <div class="mb-2">
+                                            <strong>Email:</strong>
+                                            <span id="profileEmail">Loading...</span>
+                                        </div>
+                                        <div class="mb-2">
+                                            <strong>Department:</strong>
+                                            <span id="profileDepartment">Loading...</span>
+                                        </div>
+                                        <div class="mb-2">
+                                            <strong>Phone:</strong>
+                                            <span id="profilePhone">Loading...</span>
+                                        </div>
+                                        <div class="mb-2">
+                                            <strong>Member Since:</strong>
+                                            <span id="profileSince">Loading...</span>
+                                        </div>
+                                    </div>
+                                    <div class="mt-3">
+                                        <button class="btn btn-primary btn-sm" onclick="editProfile()">
+                                            <i class="fas fa-edit"></i> Edit Profile
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-8">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-cog"></i> Account Settings</h5>
+                                </div>
+                                <div class="card-body">
+                                    <form id="profileForm">
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <div class="mb-3">
+                                                    <label class="form-label">Full Name</label>
+                                                    <input type="text" class="form-control" id="editName" readonly>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="mb-3">
+                                                    <label class="form-label">Email</label>
+                                                    <input type="email" class="form-control" id="editEmail" readonly>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <div class="mb-3">
+                                                    <label class="form-label">Department</label>
+                                                    <input type="text" class="form-control" id="editDepartment" readonly>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="mb-3">
+                                                    <label class="form-label">Phone</label>
+                                                    <input type="tel" class="form-control" id="editPhone" readonly>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="mb-3" id="editButtons" style="display: none;">
+                                            <button type="button" class="btn btn-success me-2" onclick="saveProfile()">
+                                                <i class="fas fa-save"></i> Save Changes
+                                            </button>
+                                            <button type="button" class="btn btn-secondary" onclick="cancelEdit()">
+                                                <i class="fas fa-times"></i> Cancel
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                            
+                            <div class="card mt-3">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-chart-line"></i> Your Activity</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row text-center">
+                                        <div class="col-md-3">
+                                            <div class="border-end">
+                                                <h4 id="activityStudents">0</h4>
+                                                <small class="text-muted">Students Managed</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="border-end">
+                                                <h4 id="activityClasses">0</h4>
+                                                <small class="text-muted">Classes Conducted</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="border-end">
+                                                <h4 id="activityAttendance">0</h4>
+                                                <small class="text-muted">Attendance Records</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <h4 id="activityAverage">0%</h4>
+                                            <small class="text-muted">Avg Attendance</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <!-- Add Student Modal -->
+    <div class="modal fade" id="addStudentModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add New Student</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="addStudentForm">
+                        <div class="mb-3">
+                            <label class="form-label">Roll Number</label>
+                            <input type="text" class="form-control" id="rollNumber" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Name</label>
+                            <input type="text" class="form-control" id="studentName" required>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label">Class</label>
+                                    <input type="text" class="form-control" id="studentClass">
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label">Section</label>
+                                    <input type="text" class="form-control" id="studentSection">
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label">Stream</label>
+                                    <input type="text" class="form-control" id="studentStream">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Email</label>
+                            <input type="email" class="form-control" id="studentEmail">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Student Photo (Optional)</label>
+                            <input type="file" class="form-control" id="newStudentPhoto" accept="image/*">
+                            <small class="text-muted">Upload a photo for facial recognition</small>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="addStudent()">Add Student</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Class Modal -->
+    <div class="modal fade" id="addClassModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add New Class</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="addClassForm">
+                        <div class="mb-3">
+                            <label class="form-label">Class Name</label>
+                            <input type="text" class="form-control" id="className" required placeholder="e.g., 10th Grade">
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Section</label>
+                                    <input type="text" class="form-control" id="classSection" placeholder="e.g., A">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Stream</label>
+                                    <input type="text" class="form-control" id="classStream" placeholder="e.g., Science">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Description</label>
+                            <textarea class="form-control" id="classDescription" rows="3" placeholder="Optional class description"></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="addClass()">Add Class</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Student Modal -->
+    <div class="modal fade" id="editStudentModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Student</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="editStudentForm">
+                        <input type="hidden" id="editStudentId">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Roll Number</label>
+                                    <input type="text" class="form-control" id="editRollNumber" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Name</label>
+                                    <input type="text" class="form-control" id="editStudentName" required>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label">Class</label>
+                                    <input type="text" class="form-control" id="editClassName">
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label">Section</label>
+                                    <input type="text" class="form-control" id="editSection">
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label">Stream</label>
+                                    <input type="text" class="form-control" id="editStream">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Email</label>
+                            <input type="email" class="form-control" id="editStudentEmail" placeholder="student@example.com">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="updateStudent()">Update Student</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/static/js/immediate_photo_fix.js"></script>
+    <script src="/static/js/dashboard_enhanced.js"></script>
+    <script src="/static/js/dashboard_enhancements.js"></script>
+    <script src="/static/js/enhanced_photo_display.js"></script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+sqlalchemy
+python-multipart
+python-jose[cryptography]
+passlib[bcrypt]
+python-decouple
+jinja2
+aiofiles
+pandas
+openpyxl
+opencv-python
+pillow
+numpy

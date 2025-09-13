@@ -1,0 +1,62 @@
+{
+  "1": {
+    "face_path": "ultra_faces\\ultra_student_1.jpg",
+    "photo_url": "https://drive.google.com/uc?export=view&id=1DO9R6TnvkxV1e3x3Q_WMCle_b7Gsg6sa",
+    "feature_types": [
+      "lbp",
+      "gradient",
+      "regional",
+      "gabor",
+      "edges"
+    ],
+    "total_features": 5039
+  },
+  "2": {
+    "face_path": "ultra_faces\\ultra_student_2.jpg",
+    "photo_url": "https://drive.google.com/uc?export=view&id=1vkPLB_8QaMcnxTqwSEwSRFgbb1fyOULM",
+    "feature_types": [
+      "lbp",
+      "gradient",
+      "regional",
+      "gabor",
+      "edges"
+    ],
+    "total_features": 5039
+  },
+  "3": {
+    "face_path": "ultra_faces\\ultra_student_3.jpg",
+    "photo_url": "https://drive.google.com/uc?export=view&id=1duejBGkowkEt8NCRVD6Snnv5Go0bmzzs",
+    "feature_types": [
+      "lbp",
+      "gradient",
+      "regional",
+      "gabor",
+      "edges"
+    ],
+    "total_features": 5039
+  },
+  "4": {
+    "face_path": "ultra_faces\\ultra_student_4.jpg",
+    "photo_url": "https://drive.google.com/uc?export=view&id=1wA9SPR9s3LdQvdjITJxDCgTlyDjdrqu0",
+    "feature_types": [
+      "lbp",
+      "gradient",
+      "regional",
+      "gabor",
+      "edges"
+    ],
+    "total_features": 5039
+  },
+  "5": {
+    "face_path": "ultra_faces\\ultra_student_5.jpg",
+    "photo_url": "https://drive.google.com/uc?export=view&id=1AZ40GsrBrb6Z6iI3yi1UDjSVDlnp1dch",
+    "feature_types": [
+      "lbp",
+      "gradient",
+      "regional",
+      "gabor",
+      "edges"
+    ],
+    "total_features": 5039
+  }
+}
